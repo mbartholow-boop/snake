@@ -52,6 +52,14 @@ const CHARACTERS = [
   },
 ];
 
+// ── Crank boost (simulated via rapid C taps in browser) ───────────
+const CRANK_TAP_VALUE  = 22;   // meter filled per tap (0-100)
+const CRANK_DECAY_RATE = 18;   // meter drained per second when not tapping
+const CRANK_BOOST_SPD  = 0.45; // speed multiplier while boosting (lower = faster)
+const CRANK_BOOST_MIN  = 40;   // meter level needed to start boosting
+let crankMeter = 0;            // 0-100
+let crankBoosting = false;
+
 // ── Game state ─────────────────────────────────────────────────────
 let state = 'title';       // title | select | play | gameover | leaderboard
 let player = null;
@@ -179,7 +187,8 @@ class Snake {
   update(delta) {
     if (!this.alive) return;
     this.moveTimer += delta;
-    const spd = (this.charDef?.ability === 'dash' && this.abilityActive) ? this.speed * 0.4 : this.speed;
+    let spd = (this.charDef?.ability === 'dash' && this.abilityActive) ? this.speed * 0.4 : this.speed;
+    if (this.isPlayer && crankBoosting) spd *= CRANK_BOOST_SPD;
     if (this.moveTimer >= spd) {
       this.moveTimer -= spd;
       this.stepMove();
@@ -495,6 +504,8 @@ function startGame(charIndex) {
   bossWarning = false;
   boss = null;
   particles = [];
+  crankMeter = 0;
+  crankBoosting = false;
 
   // Place player in center
   player = new Snake(COLS / 2 | 0, ROWS / 2 | 0, 'right', 4, def.baseSpeed, WHITE, true, def);
@@ -511,6 +522,17 @@ function handlePlayInput() {
   if (consumeKey('ArrowLeft'))  player.turnTo('left');
   if (consumeKey('ArrowRight')) player.turnTo('right');
   if (consumeKey('KeyZ') || consumeKey('KeyX')) player.useAbility();
+  if (consumeKey('KeyC')) {
+    crankMeter = Math.min(100, crankMeter + CRANK_TAP_VALUE);
+    spawnParticles(player.head.x, player.head.y, 2, GRAY);
+  }
+}
+
+function updateCrank(delta) {
+  if (crankMeter > 0) {
+    crankMeter = Math.max(0, crankMeter - CRANK_DECAY_RATE * delta / 1000);
+  }
+  crankBoosting = crankMeter >= CRANK_BOOST_MIN;
 }
 
 // ── Draw routines ──────────────────────────────────────────────────
@@ -571,6 +593,20 @@ function drawHUD() {
       ctx.fillText(player.charDef.desc.toUpperCase() + '!', W / 2, H - 4);
     }
   }
+
+  // Crank boost meter (bottom-left)
+  const crankBarW = 36;
+  const crankBarX = 4, crankBarY = H - 14;
+  ctx.fillStyle = DKGRAY;
+  ctx.fillRect(crankBarX, crankBarY, crankBarW, 5);
+  ctx.fillStyle = crankBoosting
+    ? (Math.floor(Date.now() / 120) % 2 === 0 ? WHITE : GRAY)
+    : GRAY;
+  ctx.fillRect(crankBarX, crankBarY, crankBarW * (crankMeter / 100), 5);
+  ctx.fillStyle = crankBoosting ? WHITE : GRAY;
+  ctx.font = '6px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(crankBoosting ? 'BOOST!' : 'CRANK C', crankBarX, crankBarY - 2);
 
   // Enemy count
   const alive = enemies.filter(e => e.alive).length;
@@ -798,6 +834,7 @@ function update(delta) {
   if (state !== 'play') return;
 
   handlePlayInput();
+  updateCrank(delta);
 
   // Timer
   timeLeft -= delta / 1000;
