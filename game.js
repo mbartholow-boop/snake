@@ -24,7 +24,7 @@ const CHARACTERS = [
     tip: 'Z: Dash forward 3 tiles',
     color: WHITE,
     headChar: 'V',
-    baseSpeed: 120, // ms per move
+    baseSpeed: 200, // ms per move
     ability: 'dash',
     abilityCooldown: 5000,
   },
@@ -35,7 +35,7 @@ const CHARACTERS = [
     tip: 'Z: Eat adjacent tiles too',
     color: WHITE,
     headChar: 'C',
-    baseSpeed: 150,
+    baseSpeed: 240,
     ability: 'widebite',
     abilityCooldown: 6000,
   },
@@ -46,7 +46,7 @@ const CHARACTERS = [
     tip: 'Z: Invincible for 2s',
     color: WHITE,
     headChar: 'S',
-    baseSpeed: 140,
+    baseSpeed: 220,
     ability: 'shield',
     abilityCooldown: 8000,
   },
@@ -200,32 +200,66 @@ class Snake {
   draw() {
     if (!this.alive) return;
     const flash = this.shielded && Math.floor(Date.now() / 100) % 2 === 0;
-    ctx.fillStyle = flash ? GRAY : this.color;
 
-    for (let i = 1; i < this.segments.length; i++) {
-      const s = this.segments[i];
-      ctx.fillRect(s.x * GRID + 1, s.y * GRID + 1, GRID - 2, GRID - 2);
-    }
-
-    // Head
-    const h = this.head;
-    ctx.fillStyle = this.isBoss ? WHITE : this.color;
-    ctx.fillRect(h.x * GRID, h.y * GRID, GRID, GRID);
-
-    if (this.isPlayer && this.charDef) {
-      ctx.fillStyle = BLACK;
-      ctx.font = '6px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(this.charDef.headChar, h.x * GRID + GRID / 2, h.y * GRID + GRID - 1);
-    }
-
-    // Eaten-progress overlay (dimmed tail sections)
-    if (!this.isPlayer && this.eatProgress > 0) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      const start = this.segments.length - this.eatProgress;
-      for (let i = Math.max(1, start); i < this.segments.length; i++) {
+    if (this.isPlayer) {
+      // Player body: white filled with black border, checkerboard pattern
+      for (let i = 1; i < this.segments.length; i++) {
         const s = this.segments[i];
+        const checker = (i % 2 === 0);
+        ctx.fillStyle = checker ? WHITE : GRAY;
         ctx.fillRect(s.x * GRID + 1, s.y * GRID + 1, GRID - 2, GRID - 2);
+        ctx.strokeStyle = BLACK;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(s.x * GRID + 1, s.y * GRID + 1, GRID - 2, GRID - 2);
+      }
+
+      // Player head: larger, white, with black letter
+      const h = this.head;
+      const hx = h.x * GRID, hy = h.y * GRID;
+      // Glow ring
+      if (!flash) {
+        ctx.strokeStyle = WHITE;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(hx - 2, hy - 2, GRID + 4, GRID + 4);
+      }
+      ctx.fillStyle = flash ? GRAY : WHITE;
+      ctx.fillRect(hx - 1, hy - 1, GRID + 2, GRID + 2);
+      ctx.fillStyle = BLACK;
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(this.charDef.headChar, hx + GRID / 2, hy + GRID - 1);
+
+      // Arrow above head pointing in movement direction
+      const arrowOffset = { up: [0,-4], down: [0, GRID+4], left: [-4, GRID/2], right: [GRID+4, GRID/2] };
+      const [ax, ay] = arrowOffset[this.dir] || [0, -4];
+      ctx.fillStyle = WHITE;
+      ctx.beginPath();
+      if (this.dir === 'up')    { ctx.moveTo(hx+GRID/2, hy+ay-3); ctx.lineTo(hx+GRID/2-3, hy+ay+3); ctx.lineTo(hx+GRID/2+3, hy+ay+3); }
+      if (this.dir === 'down')  { ctx.moveTo(hx+GRID/2, hy+ay+3); ctx.lineTo(hx+GRID/2-3, hy+ay-3); ctx.lineTo(hx+GRID/2+3, hy+ay-3); }
+      if (this.dir === 'left')  { ctx.moveTo(hx+ax-3, hy+ay);   ctx.lineTo(hx+ax+3, hy+ay-3); ctx.lineTo(hx+ax+3, hy+ay+3); }
+      if (this.dir === 'right') { ctx.moveTo(hx+ax+3, hy+ay);   ctx.lineTo(hx+ax-3, hy+ay-3); ctx.lineTo(hx+ax-3, hy+ay+3); }
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Enemy body: simple small squares
+      ctx.fillStyle = flash ? GRAY : this.color;
+      for (let i = 1; i < this.segments.length; i++) {
+        const s = this.segments[i];
+        ctx.fillRect(s.x * GRID + 2, s.y * GRID + 2, GRID - 4, GRID - 4);
+      }
+      // Enemy head
+      const h = this.head;
+      ctx.fillStyle = this.isBoss ? WHITE : GRAY;
+      ctx.fillRect(h.x * GRID + 1, h.y * GRID + 1, GRID - 2, GRID - 2);
+
+      // Eaten-progress overlay (dimmed tail sections)
+      if (this.eatProgress > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        const start = this.segments.length - this.eatProgress;
+        for (let i = Math.max(1, start); i < this.segments.length; i++) {
+          const s = this.segments[i];
+          ctx.fillRect(s.x * GRID + 2, s.y * GRID + 2, GRID - 4, GRID - 4);
+        }
       }
     }
   }
@@ -268,10 +302,10 @@ function drawParticles() {
 
 // ── Map / enemy spawning ───────────────────────────────────────────
 const ENEMY_CONFIGS = [
-  { length: 3, speed: 200, points: 30 },
-  { length: 5, speed: 180, points: 60 },
-  { length: 8, speed: 160, points: 100 },
-  { length: 12, speed: 220, points: 150 },
+  { length: 3, speed: 320, points: 30 },
+  { length: 5, speed: 290, points: 60 },
+  { length: 8, speed: 260, points: 100 },
+  { length: 12, speed: 340, points: 150 },
 ];
 
 const DIRS = ['up','down','left','right'];
@@ -465,7 +499,7 @@ function startGame(charIndex) {
   // Place player in center
   player = new Snake(COLS / 2 | 0, ROWS / 2 | 0, 'right', 4, def.baseSpeed, WHITE, true, def);
 
-  spawnEnemies(r, 8);
+  spawnEnemies(r, 4);
   state = 'play';
 }
 
@@ -778,7 +812,7 @@ function update(delta) {
   }
 
   // Respawn enemies if too few
-  if (enemies.filter(e => e.alive).length < 4) {
+  if (enemies.filter(e => e.alive).length < 3) {
     spawnOneEnemy(null);
   }
 
