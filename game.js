@@ -450,9 +450,13 @@ function eatSection(enemy, segIndex) {
   // Remove the eaten section
   enemy.segments.splice(segIndex, 1);
   if (enemy.segments.length <= 1) {
-    // Fully eaten
+    // Fully eaten — grow player by one segment
     score += enemy.points;
     spawnParticles(enemy.head.x, enemy.head.y, 10, WHITE);
+    if (player && player.alive) {
+      const tail = player.segments[player.segments.length - 1];
+      player.segments.push({ ...tail });
+    }
     enemy.alive = false;
     if (enemy === boss) {
       boss = null;
