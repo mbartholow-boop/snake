@@ -1,0 +1,7 @@
+name=Snake Clash
+author=Snake Clash Dev
+description=Eat enemy snakes to grow. Survive 3 minutes for the boss!
+bundleID=user.snakeclash
+version=1.0
+buildNumber=1
+imagePath=images
